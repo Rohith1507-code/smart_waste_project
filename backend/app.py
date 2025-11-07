@@ -26,8 +26,8 @@ BASE_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 
 app = Flask(
     __name__,
-    template_folder=os.path.join(BASE_DIR, "templates"),
-    static_folder=os.path.join(BASE_DIR, "static")
+    template_folder=os.path.join(BASE_DIR, "../frontend/templates"),
+    static_folder=os.path.join(BASE_DIR, "../frontend/static")
 )
 
 app.config["JWT_SECRET_KEY"] = "super-secret-change-this"  # change this for deployment
