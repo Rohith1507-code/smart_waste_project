@@ -11,7 +11,7 @@ from flask_jwt_extended import (
     get_jwt_identity, get_jwt
 )
 
-from db import (
+from backend.db import (
     bins_collection,
     alerts_collection,
     notifications_collection,
