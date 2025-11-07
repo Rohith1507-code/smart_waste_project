@@ -1,0 +1,26 @@
+# === Python cache ===
+__pycache__/
+*.py[cod]
+*$py.class
+
+# === Virtual environment ===
+venv/
+
+# === Logs ===
+*.log
+logs.txt
+
+# === IDE / Editor folders ===
+.vscode/
+.idea/
+
+# === Environment files ===
+.env
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+
+# === Flask specific ===
+instance/
+.pytest_cache/

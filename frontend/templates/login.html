@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Waste Management - Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body>
+  <div class="login-container">
+    <h2>🚮 Smart Waste Management</h2>
+
+    <!-- Step 1: Role Selection -->
+    <div class="role-selection" id="roleSelection">
+      <button id="adminBtn">👨‍💼 I am Admin</button>
+      <button id="citizenBtn">🧑‍🤝‍🧑 I am Citizen</button>
+    </div>
+
+    <!-- Step 2: Admin Login -->
+    <form id="adminLoginForm" class="login-form" style="display: none;">
+      <h3>Admin Login</h3>
+      <input type="text" id="adminUsername" placeholder="Admin Username" required />
+      <input type="password" id="adminPassword" placeholder="Admin ID" required />
+      <button type="submit">Login</button>
+      <button type="button" class="backBtn">⬅ Back</button>
+      <p id="adminMessage"></p>
+    </form>
+
+    <!-- Step 2: Citizen Login -->
+    <form id="citizenLoginForm" class="login-form" style="display: none;">
+      <h3>Citizen Login</h3>
+      <input type="text" id="citizenUsername" placeholder="Citizen Username" required />
+      <input type="password" id="citizenPassword" placeholder="Password" required />
+      <button type="submit">Login</button>
+      <button type="button" class="backBtn">⬅ Back</button>
+      <p id="citizenMessage"></p>
+    </form>
+  </div>
+
+  <!-- ✅ Success Popup Animation -->
+  <div id="loginSuccess" class="success-popup">
+    <div class="success-checkmark">
+      <div class="check-icon">
+        <span class="icon-line line-tip"></span>
+        <span class="icon-line line-long"></span>
+        <div class="icon-circle"></div>
+        <div class="icon-fix"></div>
+      </div>
+      <p>Login Successful!</p>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

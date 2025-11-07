@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Smart Waste Management</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="navbar">
+    <h2>🚮 Smart Waste Dashboard</h2>
+    <button id="logoutBtn">Logout</button>
+  </div>
+
+  <div class="content">
+    <h3 id="roleTitle"></h3>
+
+    <!-- 🗑️ Common Bin Section (Both Roles) -->
+    <div id="binSection" class="data-section">
+      <h4>🗑️ Bin Status</h4>
+      <div class="legend">
+        <span class="legend-item bin-safe">Safe (&lt; 70%)</span>
+        <span class="legend-item bin-warning">Warning (70–89%)</span>
+        <span class="legend-item bin-full">Full (≥ 90%)</span>
+      </div>
+      <div id="binsContainer" class="card-container"></div>
+    </div>
+
+    <!-- ⚠️ Corporation-Only Alerts -->
+    <div id="alertSection" class="data-section" style="display:none;">
+      <h4>⚠️ Alerts</h4>
+      <div id="alertsContainer" class="card-container"></div>
+    </div>
+
+    <!-- 🏙️ Citizen View -->
+    <div id="citizenSection" class="data-section" style="display:none;">
+      <h4>🏙️ Nearby Bins</h4>
+      <p>View the current fill levels of bins in your area.</p>
+      <div id="citizenBinsContainer" class="card-container"></div>
+    </div>
+  </div>
+
+  <!-- ↑ Scroll to Top Button -->
+  <button id="scrollTopBtn" title="Go to top">
+     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+       <polyline points="18 15 12 9 6 15"></polyline>
+     </svg>
+  </button>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+  <!-- 🔔 Toast Notification -->
+  <div id="toast" class="toast"></div>
+
+  <!-- 🔊 Notification Sound -->
+  <audio id="alertSound" src="{{ url_for('static', filename='sounds/alert.mp3') }}" preload="auto"></audio>
+</body>
+</html>

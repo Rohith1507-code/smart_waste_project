@@ -1,0 +1,6 @@
+Flask
+flask-jwt-extended
+bcrypt
+pymongo
+dnspython
+gunicorn
