@@ -22,12 +22,12 @@ from backend.db import (
 # ---------------------------------
 # Flask App Config (Frontend linked)
 # ---------------------------------
-BASE_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(
     __name__,
-    template_folder=os.path.join(BASE_DIR, "../frontend/templates"),
-    static_folder=os.path.join(BASE_DIR, "../frontend/static")
+    template_folder=os.path.join(os.path.dirname(BASE_DIR), "frontend", "templates"),
+    static_folder=os.path.join(os.path.dirname(BASE_DIR), "frontend", "static")
 )
 
 app.config["JWT_SECRET_KEY"] = "super-secret-change-this"  # change this for deployment
