@@ -1,0 +1,19 @@
+/* ===========================
+   🌍 Google Map Styling
+   =========================== */
+#map {
+  width: 100%;
+  height: 450px;
+  border-radius: 10px;
+  margin-top: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.map-container {
+  margin-top: 20px;
+}
+
+.map-container h4 {
+  color: #2e7d32;
+  margin-bottom: 8px;
+}

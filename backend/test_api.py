@@ -3,7 +3,8 @@ import random
 import time
 from datetime import datetime
 
-API_URL = "http://127.0.0.1:5000/add_data"
+# ✅ Render deployment URL
+API_URL = "https://smart-waste-project.onrender.com/add_data"
 BIN_IDS = ["BIN001", "BIN002", "BIN003"]
 WASTE_TYPES = ["biodegradable", "non-biodegradable", "hospital"]
 

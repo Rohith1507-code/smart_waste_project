@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Smart Waste Management</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/map.css') }}"> <!-- 🗺️ New CSS -->
 </head>
 <body>
   <div class="navbar">
@@ -14,6 +15,12 @@
 
   <div class="content">
     <h3 id="roleTitle"></h3>
+
+    <!-- 🗺️ Map Section -->
+    <div class="map-container">
+      <h4>📍 Bin Locations Map</h4>
+      <div id="map"></div>
+    </div>
 
     <!-- 🗑️ Common Bin Section (Both Roles) -->
     <div id="binSection" class="data-section">
@@ -47,6 +54,7 @@
      </svg>
   </button>
 
+  <!-- JS -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
   <!-- 🔔 Toast Notification -->
@@ -54,5 +62,63 @@
 
   <!-- 🔊 Notification Sound -->
   <audio id="alertSound" src="{{ url_for('static', filename='sounds/alert.mp3') }}" preload="auto"></audio>
+
+  <!-- 🗺️ Google Maps Integration -->
+  <script>
+    let map;
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: { lat: 13.0827, lng: 80.2707 }, // Default center: Chennai
+        zoom: 13,
+      });
+
+      fetch("/get_bins")
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === "success") {
+            data.bins.forEach(bin => {
+              const lat = bin.latitude || (13.05 + Math.random() * 0.06);
+              const lng = bin.longitude || (80.20 + Math.random() * 0.06);
+              const fill = bin.fill_level || 0;
+
+              let color;
+              if (fill < 70) color = "green";
+              else if (fill < 90) color = "orange";
+              else color = "red";
+
+              const marker = new google.maps.Marker({
+                position: { lat, lng },
+                map: map,
+                title: `Bin ${bin.bin_id} (${fill}%)`,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 10,
+                  fillColor: color,
+                  fillOpacity: 1,
+                  strokeWeight: 1,
+                },
+              });
+
+              const info = new google.maps.InfoWindow({
+                content: `<b>Bin ID:</b> ${bin.bin_id}<br>
+                          <b>Waste Type:</b> ${bin.waste_type}<br>
+                          <b>Fill Level:</b> ${fill}%`
+              });
+
+              marker.addListener("click", () => {
+                info.open(map, marker);
+              });
+            });
+          }
+        })
+        .catch(err => console.error("Error loading bins:", err));
+    }
+  </script>
+
+  <!-- Load Google Maps JS API -->
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCBPwFafjMUrFka1UbUtcCpI6KPnCQubHg&callback=initMap">
+  </script>
 </body>
 </html>
