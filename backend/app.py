@@ -35,6 +35,9 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=8)
 
 jwt = JWTManager(app)
 
+# ✅ Load Google Maps API Key securely from Render environment
+GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY")
+
 # ---------------------------
 # Utility: convert MongoDB data
 # ---------------------------
@@ -275,7 +278,7 @@ def home():
 
 @app.route("/dashboard")
 def dashboard():
-    return render_template("dashboard.html")
+    return render_template("dashboard.html", google_maps_key=GOOGLE_MAPS_KEY)
 
 @app.route("/alerts")
 def alerts_page():
