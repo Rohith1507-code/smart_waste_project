@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Smart Waste Management</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/map.css') }}"> <!-- 🗺️ New CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/map.css') }}"> <!-- 🗺️ Map styling -->
 </head>
 <body>
   <div class="navbar">
@@ -69,7 +69,7 @@
 
     function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 13.0827, lng: 80.2707 }, // Default center: Chennai
+        center: { lat: 13.0827, lng: 80.2707 }, // Default: Chennai
         zoom: 13,
       });
 
@@ -106,9 +106,7 @@
                           <b>Fill Level:</b> ${fill}%`
               });
 
-              marker.addListener("click", () => {
-                info.open(map, marker);
-              });
+              marker.addListener("click", () => info.open(map, marker));
             });
           }
         })
@@ -116,9 +114,9 @@
     }
   </script>
 
-  <!-- Load Google Maps JS API -->
+  <!-- Load Google Maps JS API securely from Flask -->
   <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCBPwFafjMUrFka1UbUtcCpI6KPnCQubHg&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap">
   </script>
 </body>
 </html>
