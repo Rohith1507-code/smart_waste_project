@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Smart Waste Management</title>
+
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/map.css') }}"> <!-- 🗺️ Map styling -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/map.css') }}">
 </head>
+
 <body>
   <div class="navbar">
     <h2>🚮 Smart Waste Dashboard</h2>
@@ -16,13 +18,11 @@
   <div class="content">
     <h3 id="roleTitle"></h3>
 
-    <!-- 🗺️ Map Section -->
     <div class="map-container">
       <h4>📍 Bin Locations Map</h4>
       <div id="map"></div>
     </div>
 
-    <!-- 🗑️ Common Bin Section (Both Roles) -->
     <div id="binSection" class="data-section">
       <h4>🗑️ Bin Status</h4>
       <div class="legend">
@@ -33,13 +33,11 @@
       <div id="binsContainer" class="card-container"></div>
     </div>
 
-    <!-- ⚠️ Corporation-Only Alerts -->
     <div id="alertSection" class="data-section" style="display:none;">
       <h4>⚠️ Alerts</h4>
       <div id="alertsContainer" class="card-container"></div>
     </div>
 
-    <!-- 🏙️ Citizen View -->
     <div id="citizenSection" class="data-section" style="display:none;">
       <h4>🏙️ Nearby Bins</h4>
       <p>View the current fill levels of bins in your area.</p>
@@ -47,34 +45,28 @@
     </div>
   </div>
 
-  <!-- ↑ Scroll to Top Button -->
   <button id="scrollTopBtn" title="Go to top">
-     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-       <polyline points="18 15 12 9 6 15"></polyline>
+     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+       <polyline points="18 15 12 9 6 15" stroke="white" stroke-width="2" fill="none"/>
      </svg>
   </button>
 
-  <!-- JS -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-  <!-- 🔔 Toast Notification -->
   <div id="toast" class="toast"></div>
-
-  <!-- 🔊 Notification Sound -->
   <audio id="alertSound" src="{{ url_for('static', filename='sounds/alert.mp3') }}" preload="auto"></audio>
 
-  <!-- 🗺️ Google Maps Integration -->
   <script>
     let map;
 
     function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 13.0827, lng: 80.2707 }, // Default: Chennai
+        center: { lat: 13.0827, lng: 80.2707 },
         zoom: 13,
       });
 
       fetch("/get_bins")
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
           if (data.status === "success") {
             data.bins.forEach(bin => {
@@ -82,10 +74,10 @@
               const lng = bin.longitude || (80.20 + Math.random() * 0.06);
               const fill = bin.fill_level || 0;
 
-              let color;
-              if (fill < 70) color = "green";
-              else if (fill < 90) color = "orange";
-              else color = "red";
+              let color =
+                fill < 70 ? "green" :
+                fill < 90 ? "orange" :
+                "red";
 
               const marker = new google.maps.Marker({
                 position: { lat, lng },
@@ -101,22 +93,29 @@
               });
 
               const info = new google.maps.InfoWindow({
-                content: `<b>Bin ID:</b> ${bin.bin_id}<br>
-                          <b>Waste Type:</b> ${bin.waste_type}<br>
-                          <b>Fill Level:</b> ${fill}%`
+                content: `
+                  <b>Bin ID:</b> ${bin.bin_id}<br>
+                  <b>Waste Type:</b> ${bin.waste_type}<br>
+                  <b>Fill Level:</b> ${fill}%`
               });
 
               marker.addListener("click", () => info.open(map, marker));
             });
           }
-        })
-        .catch(err => console.error("Error loading bins:", err));
+        });
     }
+
+    function loadMapScript() {
+      const s = document.createElement("script");
+      s.src =
+        "https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap";
+      s.async = true;
+      s.defer = true;
+      document.body.appendChild(s);
+    }
+
+    window.onload = loadMapScript;
   </script>
 
-  <!-- Load Google Maps JS API securely from Flask -->
-  <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap">
-  </script>
 </body>
 </html>

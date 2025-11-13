@@ -19,9 +19,6 @@ from backend.db import (
     collected_records
 )
 
-# ---------------------------------
-# Flask App Config (Frontend linked)
-# ---------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(
@@ -30,20 +27,18 @@ app = Flask(
     static_folder=os.path.join(os.path.dirname(BASE_DIR), "frontend", "static")
 )
 
-app.config["JWT_SECRET_KEY"] = "super-secret-change-this"  # change this for deployment
+app.config["JWT_SECRET_KEY"] = "super-secret-change-this"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=8)
 
 jwt = JWTManager(app)
 
-# ✅ Load Google Maps API Key securely from Render environment
+# Secure — key loaded from Render env
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY")
 
-# ---------------------------
-# Utility: convert MongoDB data
-# ---------------------------
+
 def convert_mongo_obj(data):
     if isinstance(data, list):
-        return [convert_mongo_obj(item) for item in data]
+        return [convert_mongo_obj(i) for i in data]
     if isinstance(data, dict):
         return {k: convert_mongo_obj(v) for k, v in data.items()}
     if isinstance(data, ObjectId):
@@ -52,25 +47,19 @@ def convert_mongo_obj(data):
         return data.isoformat()
     return data
 
-# ---------------------------
-# Role decorator
-# ---------------------------
-def roles_required(allowed_roles):
+
+def roles_required(allowed):
     def decorator(fn):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            claims = get_jwt()
-            role = claims.get("role")
-            if role not in allowed_roles:
-                return jsonify({"msg": "Access forbidden: insufficient role"}), 403
+            if get_jwt().get("role") not in allowed:
+                return jsonify({"msg": "Access forbidden"}), 403
             return fn(*args, **kwargs)
         return wrapper
     return decorator
 
-# ---------------------------
-# Create default users
-# ---------------------------
+
 def create_default_users():
     if users_collection.count_documents({}) == 0:
         users = [
@@ -86,22 +75,14 @@ def create_default_users():
             }
         ]
         users_collection.insert_many(users)
-        print("✅ Default users created:")
-        print(" - Corporation: corp_admin / corp123")
-        print(" - Citizen: citizen1 / cit123")
 
-# ---------------------------
-# Authentication endpoints
-# ---------------------------
+
 @app.route("/login", methods=["POST"])
 def login():
-    """
-    Login with username, password, and role verification.
-    """
     data = request.get_json() or {}
     username = data.get("username")
     password = data.get("password")
-    role_input = data.get("role")  # role sent from frontend
+    role_input = data.get("role")
 
     if not username or not password:
         return jsonify({"msg": "Username and password required"}), 400
@@ -110,49 +91,22 @@ def login():
     if not user:
         return jsonify({"msg": "Invalid credentials"}), 401
 
-    stored_pw = user["password"].encode()
-    if not bcrypt.checkpw(password.encode(), stored_pw):
+    if not bcrypt.checkpw(password.encode(), user["password"].encode()):
         return jsonify({"msg": "Invalid credentials"}), 401
 
-    # ✅ Enforce role-based login
-    if role_input and role_input.lower() != user["role"].lower():
-        return jsonify({
-            "msg": f"Access denied: You tried to log in as '{role_input}', "
-                   f"but this account is registered as '{user['role']}'."
-        }), 403
+    if role_input.lower() != user["role"].lower():
+        return jsonify({"msg": f"Role mismatch. This user is '{user['role']}'"}), 403
 
     token = create_access_token(identity=username, additional_claims={"role": user["role"]})
-    return jsonify({"access_token": token, "role": user["role"]}), 200
+    return jsonify({"access_token": token, "role": user["role"]})
 
-@app.route("/register", methods=["POST"])
-def register():
-    """
-    Register a new user (optional)
-    """
-    data = request.get_json() or {}
-    username = data.get("username")
-    password = data.get("password")
-    role = data.get("role", "citizen")
 
-    if not username or not password:
-        return jsonify({"msg": "Username and password required"}), 400
-    if users_collection.find_one({"username": username}):
-        return jsonify({"msg": "Username already exists"}), 400
-
-    hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    users_collection.insert_one({"username": username, "password": hashed_pw, "role": role})
-    return jsonify({"msg": "User created", "username": username, "role": role}), 201
-
-# ---------------------------
-# Add bin data (IoT Simulation)
-# ---------------------------
 @app.route("/add_data", methods=["POST"])
 def add_data():
     data = request.get_json()
     data["timestamp"] = datetime.utcnow()
     bins_collection.insert_one(data)
 
-    # If bin is full -> alert + notification
     if data.get("fill_level", 0) >= 80:
         alert = {
             "bin_id": data["bin_id"],
@@ -164,7 +118,6 @@ def add_data():
         res = alerts_collection.insert_one(alert)
         alert["_id"] = res.inserted_id
 
-        # Assign receiver (based on waste type)
         if alert["waste_type"] == "biodegradable":
             receiver = "Composting Facility"
         elif alert["waste_type"] == "non-biodegradable":
@@ -175,7 +128,7 @@ def add_data():
         notification = {
             "bin_id": alert["bin_id"],
             "receiver": receiver,
-            "message": f"📩 Notification sent to {receiver} for {alert['waste_type']} waste bin {alert['bin_id']}.",
+            "message": f"📩 Sent to {receiver} for {alert['waste_type']} bin {alert['bin_id']}.",
             "timestamp": datetime.utcnow()
         }
         notifications_collection.insert_one(notification)
@@ -184,42 +137,27 @@ def add_data():
             "status": "success",
             "alert": convert_mongo_obj(alert),
             "notification": convert_mongo_obj(notification)
-        }), 200
+        })
 
-    return jsonify({"status": "success", "data": convert_mongo_obj(data)}), 200
+    return jsonify({"status": "success", "data": convert_mongo_obj(data)})
 
-# ---------------------------
-# View alerts (Role-based)
-# ---------------------------
-@app.route("/get_alerts", methods=["GET"])
+
+@app.route("/get_alerts")
 @jwt_required(optional=True)
 def get_alerts():
-    try:
-        claims = get_jwt()
-        role = claims.get("role")
-    except Exception:
-        role = None
+    role = (get_jwt() or {}).get("role")
+    if role != "corporation":
+        return jsonify({"msg": "Forbidden"}), 403
+    alerts = list(alerts_collection.find())
+    return jsonify({"status": "success", "alerts": convert_mongo_obj(alerts)})
 
-    if role == "corporation":
-        alerts = list(alerts_collection.find())
-    elif role == "citizen":
-        return jsonify({"msg": "Citizens cannot access alerts"}), 403
-    else:
-        return jsonify({"msg": "Authentication required"}), 401
 
-    return jsonify({"status": "success", "alerts": convert_mongo_obj(alerts)}), 200
-
-# ---------------------------
-# Get bins (Public)
-# ---------------------------
-@app.route("/get_bins", methods=["GET"])
+@app.route("/get_bins")
 def get_bins():
     bins = list(bins_collection.find())
-    return jsonify({"status": "success", "bins": convert_mongo_obj(bins)}), 200
+    return jsonify({"status": "success", "bins": convert_mongo_obj(bins)})
 
-# ---------------------------
-# Mark bin alert as collected
-# ---------------------------
+
 @app.route("/collect/<alert_id>", methods=["POST"])
 @roles_required(["corporation"])
 def collect_alert(alert_id):
@@ -228,7 +166,6 @@ def collect_alert(alert_id):
         return jsonify({"msg": "Alert not found"}), 404
 
     username = get_jwt_identity()
-
     update = {
         "collected": True,
         "collected_by": username,
@@ -246,47 +183,28 @@ def collect_alert(alert_id):
     }
     collected_records.insert_one(record)
 
-    return jsonify({"msg": "Alert marked as collected", "record": convert_mongo_obj(record)}), 200
+    return jsonify({"msg": "Collected", "record": convert_mongo_obj(record)})
 
-# ---------------------------
-# View notifications (Role-based)
-# ---------------------------
-@app.route("/get_notifications", methods=["GET"])
+
+@app.route("/get_notifications")
 @jwt_required(optional=True)
 def get_notifications():
-    try:
-        claims = get_jwt()
-        role = claims.get("role")
-    except Exception:
-        role = None
+    if (get_jwt() or {}).get("role") != "corporation":
+        return jsonify({"msg": "Forbidden"}), 403
+    notes = list(notifications_collection.find())
+    return jsonify({"status": "success", "notifications": convert_mongo_obj(notes)})
 
-    if role == "corporation":
-        notes = list(notifications_collection.find())
-    elif role == "citizen":
-        return jsonify({"msg": "Citizens cannot view notifications"}), 403
-    else:
-        return jsonify({"msg": "Authentication required"}), 401
 
-    return jsonify({"status": "success", "notifications": convert_mongo_obj(notes)}), 200
-
-# ---------------------------
-# FRONTEND ROUTES
-# ---------------------------
 @app.route("/")
 def home():
     return render_template("login.html")
+
 
 @app.route("/dashboard")
 def dashboard():
     return render_template("dashboard.html", google_maps_key=GOOGLE_MAPS_KEY)
 
-@app.route("/alerts")
-def alerts_page():
-    return render_template("alerts.html")
 
-# ---------------------------
-# App startup
-# ---------------------------
 if __name__ == "__main__":
     create_default_users()
     app.run(debug=True)
