@@ -5,6 +5,7 @@ from bson import ObjectId
 from functools import wraps
 import bcrypt
 import os
+import random  # ➕ for OTP generation
 
 from flask_jwt_extended import (
     JWTManager, create_access_token, jwt_required,
@@ -36,6 +37,9 @@ jwt = JWTManager(app)
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY")
 
 
+# -----------------------------
+# Helpers
+# -----------------------------
 def convert_mongo_obj(data):
     if isinstance(data, list):
         return [convert_mongo_obj(i) for i in data]
@@ -61,21 +65,38 @@ def roles_required(allowed):
 
 
 def create_default_users():
+    """
+    Create one default corporation admin and one demo citizen
+    (already marked as verified).
+    """
     if users_collection.count_documents({}) == 0:
         users = [
             {
                 "username": "corp_admin",
                 "password": bcrypt.hashpw("corp123".encode(), bcrypt.gensalt()).decode(),
-                "role": "corporation"
+                "role": "corporation",
+                "phone": None,
+                "is_verified": True
             },
             {
                 "username": "citizen1",
                 "password": bcrypt.hashpw("cit123".encode(), bcrypt.gensalt()).decode(),
-                "role": "citizen"
+                "role": "citizen",
+                "phone": None,
+                "is_verified": True
             }
         ]
         users_collection.insert_many(users)
 
+
+def generate_otp():
+    """Generate a 6-digit OTP as a string."""
+    return f"{random.randint(100000, 999999)}"
+
+
+# -----------------------------
+# Authentication & OTP
+# -----------------------------
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -94,13 +115,109 @@ def login():
     if not bcrypt.checkpw(password.encode(), user["password"].encode()):
         return jsonify({"msg": "Invalid credentials"}), 401
 
-    if role_input.lower() != user["role"].lower():
+    # Role check
+    if role_input is None or role_input.lower() != user["role"].lower():
         return jsonify({"msg": f"Role mismatch. This user is '{user['role']}'"}), 403
 
+    # Citizen must be OTP-verified before login
+    if user["role"] == "citizen" and not user.get("is_verified", False):
+        return jsonify({
+            "msg": "Phone/OTP not verified. Please complete OTP verification before logging in."
+        }), 403
+
     token = create_access_token(identity=username, additional_claims={"role": user["role"]})
-    return jsonify({"access_token": token, "role": user["role"]})
+    return jsonify({"access_token": token, "role": user["role"]}), 200
 
 
+@app.route("/register", methods=["POST"])
+def register():
+    """
+    Citizen self-registration with mock OTP generation.
+    Frontend will show OTP on screen (no real SMS).
+    """
+    data = request.get_json() or {}
+    username = data.get("username")
+    password = data.get("password")
+    phone = data.get("phone")
+
+    if not username or not password or not phone:
+        return jsonify({"msg": "Username, password and phone are required"}), 400
+
+    # Check uniqueness
+    if users_collection.find_one({"username": username}):
+        return jsonify({"msg": "Username already exists"}), 400
+    if users_collection.find_one({"phone": phone}):
+        return jsonify({"msg": "Phone number already registered"}), 400
+
+    hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    otp = generate_otp()
+    otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+
+    user_doc = {
+        "username": username,
+        "password": hashed_pw,
+        "role": "citizen",
+        "phone": phone,
+        "is_verified": False,
+        "otp_code": otp,
+        "otp_expires_at": otp_expiry
+    }
+    users_collection.insert_one(user_doc)
+
+    # For demo: return OTP in response instead of SMS
+    return jsonify({
+        "msg": "Citizen registered. Please verify the OTP to activate your account.",
+        "demo_otp": otp  # ⚠️ DEMO ONLY – don't do this in production
+    }), 201
+
+
+@app.route("/verify_otp", methods=["POST"])
+def verify_otp():
+    """
+    Verify OTP for a citizen.
+    Expect: { "username": "...", "otp": "123456" }
+    """
+    data = request.get_json() or {}
+    username = data.get("username")
+    otp_input = data.get("otp")
+
+    if not username or not otp_input:
+        return jsonify({"msg": "Username and OTP are required"}), 400
+
+    user = users_collection.find_one({"username": username})
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+
+    if user.get("role") != "citizen":
+        return jsonify({"msg": "OTP verification only applies to citizen accounts"}), 400
+
+    stored_otp = user.get("otp_code")
+    expires_at = user.get("otp_expires_at")
+
+    if not stored_otp or not expires_at:
+        return jsonify({"msg": "No active OTP. Please register again."}), 400
+
+    if datetime.utcnow() > expires_at:
+        return jsonify({"msg": "OTP has expired. Please register again."}), 400
+
+    if otp_input != stored_otp:
+        return jsonify({"msg": "Invalid OTP"}), 400
+
+    # Mark as verified
+    users_collection.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {"is_verified": True},
+            "$unset": {"otp_code": "", "otp_expires_at": ""}
+        }
+    )
+
+    return jsonify({"msg": "OTP verified successfully. You can now log in."}), 200
+
+
+# -----------------------------
+# IoT Data & Alerts
+# -----------------------------
 @app.route("/add_data", methods=["POST"])
 def add_data():
     data = request.get_json()
@@ -195,6 +312,9 @@ def get_notifications():
     return jsonify({"status": "success", "notifications": convert_mongo_obj(notes)})
 
 
+# -----------------------------
+# Frontend routes
+# -----------------------------
 @app.route("/")
 def home():
     return render_template("login.html")
