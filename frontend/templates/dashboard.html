@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - Smart Waste Management</title>
+  <title>Dashboard - Smart Waste</title>
+
+  <script>
+    window.MAPS_KEY = "{{ google_maps_key }}";
+  </script>
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/map.css') }}">
@@ -19,7 +23,7 @@
     <h3 id="roleTitle"></h3>
 
     <div class="map-container">
-      <h4>📍 Bin Locations Map</h4>
+      <h4>📍 Bin Locations</h4>
       <div id="map"></div>
     </div>
 
@@ -33,89 +37,23 @@
       <div id="binsContainer" class="card-container"></div>
     </div>
 
-    <div id="alertSection" class="data-section" style="display:none;">
+    <div id="alertSection" class="data-section">
       <h4>⚠️ Alerts</h4>
       <div id="alertsContainer" class="card-container"></div>
     </div>
 
-    <div id="citizenSection" class="data-section" style="display:none;">
-      <h4>🏙️ Nearby Bins</h4>
-      <p>View the current fill levels of bins in your area.</p>
+    <div id="citizenSection" class="data-section">
+      <h4>Nearby Bins</h4>
       <div id="citizenBinsContainer" class="card-container"></div>
     </div>
   </div>
 
-  <button id="scrollTopBtn" title="Go to top">
-     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
-       <polyline points="18 15 12 9 6 15" stroke="white" stroke-width="2" fill="none"/>
-     </svg>
-  </button>
+  <div id="toast" class="toast"></div>
+  <audio id="alertSound" preload="auto"
+    src="{{ url_for('static', filename='sounds/alert.mp3') }}"></audio>
+
+  <button id="scrollTopBtn">↑</button>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
-  <div id="toast" class="toast"></div>
-  <audio id="alertSound" src="{{ url_for('static', filename='sounds/alert.mp3') }}" preload="auto"></audio>
-
-  <script>
-    let map;
-
-    function initMap() {
-      map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 13.0827, lng: 80.2707 },
-        zoom: 13,
-      });
-
-      fetch("/get_bins")
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === "success") {
-            data.bins.forEach(bin => {
-              const lat = bin.latitude || (13.05 + Math.random() * 0.06);
-              const lng = bin.longitude || (80.20 + Math.random() * 0.06);
-              const fill = bin.fill_level || 0;
-
-              let color =
-                fill < 70 ? "green" :
-                fill < 90 ? "orange" :
-                "red";
-
-              const marker = new google.maps.Marker({
-                position: { lat, lng },
-                map: map,
-                title: `Bin ${bin.bin_id} (${fill}%)`,
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  scale: 10,
-                  fillColor: color,
-                  fillOpacity: 1,
-                  strokeWeight: 1,
-                },
-              });
-
-              const info = new google.maps.InfoWindow({
-                content: `
-                  <b>Bin ID:</b> ${bin.bin_id}<br>
-                  <b>Waste Type:</b> ${bin.waste_type}<br>
-                  <b>Fill Level:</b> ${fill}%`
-              });
-
-              marker.addListener("click", () => info.open(map, marker));
-            });
-          }
-        });
-    }
-
-    function loadMapScript() {
-      const s = document.createElement("script");
-      s.src =
-        "https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=initMap";
-      s.async = true;
-      s.defer = true;
-      document.body.appendChild(s);
-    }
-
-    window.onload = loadMapScript;
-  </script>
-
 </body>
 </html>

@@ -13,7 +13,7 @@ const backBtns = document.querySelectorAll(".backBtn");
 let selectedRole = null;
 let pendingUsername = null;
 
-// UI Navigation
+// === UI Navigation ===
 adminBtn?.addEventListener("click", () => {
   roleSelection.style.display = "none";
   adminForm.style.display = "block";
@@ -51,7 +51,6 @@ async function loginUser(username, password, role, msgBox) {
     });
 
     const data = await res.json();
-
     if (res.ok) {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("role", data.role);
@@ -60,7 +59,7 @@ async function loginUser(username, password, role, msgBox) {
       msgBox.style.color = "green";
 
       const popup = document.getElementById("loginSuccess");
-      if (popup) popup.classList.add("show");
+      popup?.classList.add("show");
 
       setTimeout(() => window.location.href = "/dashboard", 1300);
     } else {
@@ -72,19 +71,18 @@ async function loginUser(username, password, role, msgBox) {
   }
 }
 
-// Admin Login
+// === Login ===
 adminForm?.addEventListener("submit", e => {
   e.preventDefault();
   loginUser(adminUsername.value, adminPassword.value, selectedRole, adminMessage);
 });
 
-// Citizen Login
 citizenForm?.addEventListener("submit", e => {
   e.preventDefault();
   loginUser(citizenUsername.value, citizenPassword.value, selectedRole, citizenMessage);
 });
 
-// === REGISTRATION ===
+// === Registration ===
 registerForm?.addEventListener("submit", async e => {
   e.preventDefault();
 
@@ -99,23 +97,17 @@ registerForm?.addEventListener("submit", async e => {
   });
 
   const data = await res.json();
-
   if (res.ok) {
     pendingUsername = regUsername.value;
-    registerMessage.textContent = "OTP Sent! Check popup!";
-    registerMessage.style.color = "green";
-
     alert("Demo OTP: " + data.demo_otp);
-
     registerForm.style.display = "none";
     otpForm.style.display = "block";
   } else {
     registerMessage.textContent = data.msg;
-    registerMessage.style.color = "red";
   }
 });
 
-// === OTP VERIFICATION ===
+// === OTP Verify ===
 otpForm?.addEventListener("submit", async e => {
   e.preventDefault();
 
@@ -126,21 +118,16 @@ otpForm?.addEventListener("submit", async e => {
   });
 
   const data = await res.json();
-
   if (res.ok) {
-    otpMessage.textContent = "OTP Verified! Login now!";
-    otpMessage.style.color = "green";
+    otpMessage.textContent = "OTP Verified! Login Now";
     setTimeout(() => {
       otpForm.style.display = "none";
       citizenForm.style.display = "block";
     }, 1200);
-  } else {
-    otpMessage.textContent = data.msg;
-    otpMessage.style.color = "red";
-  }
+  } else otpMessage.textContent = data.msg;
 });
 
-// === DASHBOARD LOGIC ===
+// === ---- DASHBOARD LOGIC ---- ===
 const token = localStorage.getItem("token");
 const role = localStorage.getItem("role");
 
@@ -148,60 +135,47 @@ let previousAlertCount = 0;
 
 function showToast(message) {
   const toast = document.getElementById("toast");
-  const sound = document.getElementById("alertSound");
-  if (!toast) return;
-
   toast.textContent = "🔔 " + message;
   toast.classList.add("show");
-  sound?.play();
   setTimeout(() => toast.classList.remove("show"), 4000);
 }
 
-// === Logout ===
 const logoutBtn = document.getElementById("logoutBtn");
 logoutBtn?.addEventListener("click", () => {
   localStorage.clear();
   window.location.href = "/";
 });
 
-// === Fetch Dashboard Data ===
+// Fetch Data
 async function fetchData() {
   if (!token) return (window.location.href = "/");
 
   document.getElementById("roleTitle").textContent = `Logged in as: ${role.toUpperCase()}`;
 
-  const binsData = await (await fetch("/get_bins")).json();
-
-  const binSection = document.getElementById("binSection");
-  const alertSection = document.getElementById("alertSection");
-  const citizenSection = document.getElementById("citizenSection");
+  const binsRes = await fetch("/get_bins");
+  const binsData = await binsRes.json();
 
   if (role === "corporation") {
-    binSection.style.display = "block";
-    alertSection.style.display = "block";
-    citizenSection.style.display = "none";
-
     populateBins(binsData.bins, "binsContainer", true);
-
-    const alertData = await (await fetch("/get_alerts", {
+    const alertsRes = await fetch("/get_alerts", {
       headers: { Authorization: "Bearer " + token }
-    })).json();
-
+    });
+    const alertData = await alertsRes.json();
     populateAlerts(alertData.alerts);
   }
 
   if (role === "citizen") {
-    binSection.style.display = "none";
-    alertSection.style.display = "none";
-    citizenSection.style.display = "block";
-
     populateBins(binsData.bins, "citizenBinsContainer", false);
   }
+
+  updateMap(binsData.bins);
 }
 
-function populateBins(bins, containerId, isAdmin) {
+// Populate Bins
+function populateBins(bins, containerId, showTime) {
   const container = document.getElementById(containerId);
   container.innerHTML = "";
+
   bins.forEach(bin => {
     const div = document.createElement("div");
     div.classList.add("card");
@@ -212,66 +186,82 @@ function populateBins(bins, containerId, isAdmin) {
 
     div.innerHTML = `
       <h4>${bin.bin_id}</h4>
-      <p>Waste: ${bin.waste_type}</p>
-      <p>Fill Level: ${bin.fill_level}%</p>
-      ${isAdmin ? `<p>Updated: ${new Date(bin.timestamp).toLocaleString()}</p>` : ""}
+      <p>${bin.waste_type}</p>
+      <p>${bin.fill_level}%</p>
+      ${showTime ? `<p>${new Date(bin.timestamp).toLocaleString()}</p>` : ""}
     `;
     container.appendChild(div);
   });
 }
 
+// Alerts
 function populateAlerts(alerts) {
   const container = document.getElementById("alertsContainer");
   container.innerHTML = "";
 
   if (!alerts?.length) {
-    container.innerHTML = "<p>No active alerts 🎉</p>";
+    container.innerHTML = "<p>No Alerts 🎉</p>";
     previousAlertCount = 0;
     return;
   }
 
-  if (alerts.length > previousAlertCount) {
-    showToast(`${alerts.length - previousAlertCount} new alert(s)!`);
-  }
+  if (alerts.length > previousAlertCount)
+    showToast(`${alerts.length - previousAlertCount} new alert(s)`);
+
   previousAlertCount = alerts.length;
 
-  alerts.forEach(alert => {
+  alerts.forEach(a => {
     const div = document.createElement("div");
     div.classList.add("card", "alert");
-
     div.innerHTML = `
-      <strong>${alert.message}</strong><br>
-      ${alert.waste_type} | Bin ${alert.bin_id}<br>
-      ${new Date(alert.timestamp).toLocaleString()}<br>
-      Status: ${alert.collected ? "✔ Collected" : "❌ Pending"}
+      <b>${a.message}</b><br>${a.waste_type}<br>${new Date(a.timestamp).toLocaleString()}
     `;
-
     container.appendChild(div);
   });
 }
 
-// Auto Refresh Dashboard
+// === GOOGLE MAP INTEGRATION ===
+let map;
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 13.06330, lng: 77.80150 },
+    zoom: 17
+  });
+}
+
+function updateMap(bins) {
+  bins.forEach(bin => {
+    if (!bin.latitude || !bin.longitude) return;
+
+    const fill = bin.fill_level;
+    const color =
+      fill < 70 ? "green" :
+      fill < 90 ? "orange" :
+      "red";
+
+    new google.maps.Marker({
+      position: { lat: bin.latitude, lng: bin.longitude },
+      map,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: color,
+        fillOpacity: 1,
+        scale: 10,
+        strokeWeight: 1,
+      },
+      title: `${bin.bin_id} ${fill}%`
+    });
+  });
+}
+
+// Load Map Script
 if (window.location.pathname.includes("/dashboard")) {
+  const s = document.createElement("script");
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${window.MAPS_KEY}&callback=initMap`;
+  s.async = true;
+  s.defer = true;
+  document.body.appendChild(s);
+
   fetchData();
   setInterval(fetchData, 10000);
 }
-
-// Scroll Top Button
-const scrollBtn = document.getElementById("scrollTopBtn");
-let hideTimeout;
-
-window.addEventListener("scroll", () => {
-  if (window.scrollY > 250) {
-    scrollBtn.classList.add("show");
-    resetHideTimer();
-  } else scrollBtn.classList.remove("show");
-});
-
-function resetHideTimer() {
-  clearTimeout(hideTimeout);
-  hideTimeout = setTimeout(() => scrollBtn.classList.remove("show"), 8500);
-}
-
-scrollBtn?.addEventListener("click", () =>
-  window.scrollTo({ top: 0, behavior: "smooth" })
-);
