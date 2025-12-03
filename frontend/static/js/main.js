@@ -51,6 +51,7 @@ async function loginUser(username, password, role, msgBox) {
     });
 
     const data = await res.json();
+
     if (res.ok) {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("role", data.role);
@@ -58,8 +59,8 @@ async function loginUser(username, password, role, msgBox) {
       msgBox.textContent = "Login Successful!";
       msgBox.style.color = "green";
 
-      const popup = document.getElementById("loginSuccess");
-      popup?.classList.add("show");
+      document.getElementById("alertSound")?.play().catch(() => {});
+      document.getElementById("loginSuccess")?.classList.add("show");
 
       setTimeout(() => window.location.href = "/dashboard", 1300);
     } else {
@@ -135,32 +136,31 @@ let previousAlertCount = 0;
 
 function showToast(message) {
   const toast = document.getElementById("toast");
+  const sound = document.getElementById("alertSound");
   if (!toast) return;
   toast.textContent = "🔔 " + message;
   toast.classList.add("show");
+  sound?.play().catch(() => {});
   setTimeout(() => toast.classList.remove("show"), 4000);
 }
 
-const logoutBtn = document.getElementById("logoutBtn");
-logoutBtn?.addEventListener("click", () => {
+document.getElementById("logoutBtn")?.addEventListener("click", () => {
   localStorage.clear();
   window.location.href = "/";
 });
 
-// Fetch Data
+// === Fetch Dashboard Data ===
 async function fetchData() {
   if (!token) return (window.location.href = "/");
 
   const roleTitle = document.getElementById("roleTitle");
-  if (roleTitle && role) {
-    roleTitle.textContent = `Logged in as: ${role.toUpperCase()}`;
-  }
+  if (roleTitle) roleTitle.textContent = `Logged in as: ${role.toUpperCase()}`;
 
   const binsRes = await fetch("/get_bins");
   const binsData = await binsRes.json();
 
   if (role === "corporation") {
-    populateBins(binsData.bins, "binsContainer", true);
+    populateBins(binsData.bins, "binsContainer", true, true);
     const alertsRes = await fetch("/get_alerts", {
       headers: { Authorization: "Bearer " + token }
     });
@@ -169,99 +169,79 @@ async function fetchData() {
   }
 
   if (role === "citizen") {
-    populateBins(binsData.bins, "citizenBinsContainer", false);
+    populateBins(binsData.bins, "citizenBinsContainer", false, false);
   }
 
   updateMap(binsData.bins);
 }
 
-// Populate Bins
-function populateBins(bins, containerId, showTime) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
+// === Populate Bins ===
+function populateBins(bins, id, showTime, showWeight) {
+  const container = document.getElementById(id);
   container.innerHTML = "";
-
   bins.forEach(bin => {
+    const fill = bin.fill_level;
     const div = document.createElement("div");
     div.classList.add("card");
-
-    if (bin.fill_level >= 90) div.classList.add("bin-full");
-    else if (bin.fill_level >= 70) div.classList.add("bin-warning");
+    if (fill >= 90) div.classList.add("bin-full");
+    else if (fill >= 70) div.classList.add("bin-warning");
     else div.classList.add("bin-safe");
 
     div.innerHTML = `
       <h4>${bin.bin_id}</h4>
-      <p>${bin.waste_type}</p>
-      <p>${bin.fill_level}%</p>
+      <p>Type: ${bin.waste_type}</p>
+      <p>Fill: ${fill}%</p>
+      ${showWeight ? `<p>Weight: ${bin.weight} kg</p>` : ""}
       ${showTime ? `<p>${new Date(bin.timestamp).toLocaleString()}</p>` : ""}
     `;
     container.appendChild(div);
   });
 }
 
-// Alerts (with Mark as Collected)
+// === Alerts (Mark as Collected) ===
 function populateAlerts(alerts) {
   const container = document.getElementById("alertsContainer");
-  if (!container) return;
-
   container.innerHTML = "";
 
-  if (!alerts || !alerts.length) {
+  if (!alerts?.length) {
     container.innerHTML = "<p>No Alerts 🎉</p>";
     previousAlertCount = 0;
     return;
   }
 
   if (alerts.length > previousAlertCount) {
-    showToast(`${alerts.length - previousAlertCount} new alert(s)`);
+    showToast(`${alerts.length - previousAlertCount} new alert(s)!`);
   }
 
   previousAlertCount = alerts.length;
 
   alerts.forEach(a => {
-    const div = document.createElement("div");
-    div.classList.add("card", "alert");
-
-    const statusText = a.collected ? "✅ Collected" : "❌ Pending";
-    const btnHTML = !a.collected
-      ? `<br><button class="collectBtn" data-id="${a._id}">Mark as Collected</button>`
+    const status = a.collected ? "✔ Collected" : "❌ Pending";
+    const btn = !a.collected ? 
+      `<button class="collectBtn" data-id="${a._id}">Mark as Collected</button>` 
       : "";
 
+    const div = document.createElement("div");
+    div.classList.add("card", "alert");
     div.innerHTML = `
-      <b>${a.message}</b><br>
+      <strong>${a.message}</strong><br>
       Type: ${a.waste_type} | Bin: ${a.bin_id}<br>
       Time: ${new Date(a.timestamp).toLocaleString()}<br>
-      Status: ${statusText}
-      ${btnHTML}
+      Status: ${status}<br>${btn}
     `;
     container.appendChild(div);
   });
 
-  // Enable "Mark as Collected" buttons
-  const collectButtons = container.querySelectorAll(".collectBtn");
-  collectButtons.forEach(btn => {
-    btn.addEventListener("click", async (e) => {
-      const id = e.target.getAttribute("data-id");
-      if (!id) return;
-
-      try {
-        const res = await fetch(`/collect/${id}`, {
-          method: "POST",
-          headers: {
-            Authorization: "Bearer " + token
-          }
-        });
-
-        if (res.ok) {
-          showToast("🧹 Bin marked as collected!");
-          fetchData();
-        } else {
-          showToast("❌ Failed to update!");
-        }
-      } catch {
-        showToast("⚠️ Network error!");
-      }
+  document.querySelectorAll(".collectBtn").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      const id = e.target.dataset.id;
+      const res = await fetch("/mark_collected", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ alert_id: id })
+      });
+      if (res.ok) showToast("🧹 Bin marked as collected!");
+      fetchData();
     });
   });
 }
@@ -271,7 +251,6 @@ let map;
 function initMap() {
   const mapEl = document.getElementById("map");
   if (!mapEl) return;
-
   map = new google.maps.Map(mapEl, {
     center: { lat: 13.06330, lng: 77.80150 },
     zoom: 17
@@ -279,16 +258,11 @@ function initMap() {
 }
 
 function updateMap(bins) {
-  if (!map || !bins) return;
-
+  if (!map) return;
   bins.forEach(bin => {
     if (!bin.latitude || !bin.longitude) return;
-
     const fill = bin.fill_level;
-    const color =
-      fill < 70 ? "green" :
-      fill < 90 ? "orange" :
-      "red";
+    const color = fill < 70 ? "green" : fill < 90 ? "orange" : "red";
 
     new google.maps.Marker({
       position: { lat: bin.latitude, lng: bin.longitude },
@@ -298,19 +272,35 @@ function updateMap(bins) {
         fillColor: color,
         fillOpacity: 1,
         scale: 10,
-        strokeWeight: 1,
+        strokeWeight: 1
       },
       title: `${bin.bin_id} ${fill}%`
     });
   });
 }
 
-// Load Map Script + start dashboard
-if (window.location.pathname.includes("/dashboard")) {
+// === Scroll to Top Button ===
+const scrollBtn = document.getElementById("scrollTopBtn");
+let timeout;
+function handleScroll() {
+  if (scrollY > 250) {
+    scrollBtn.classList.add("show");
+    resetTimer();
+  } else scrollBtn.classList.remove("show");
+}
+function resetTimer() {
+  clearTimeout(timeout);
+  timeout = setTimeout(() => scrollBtn.classList.remove("show"), 8000);
+}
+scrollBtn?.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+document.addEventListener("scroll", handleScroll);
+document.addEventListener("mousemove", () => { if (scrollY > 250) resetTimer(); });
+
+// === Load Map When on Dashboard ===
+if (location.pathname.includes("/dashboard")) {
   const s = document.createElement("script");
   s.src = `https://maps.googleapis.com/maps/api/js?key=${window.MAPS_KEY}&callback=initMap`;
   s.async = true;
-  s.defer = true;
   document.body.appendChild(s);
 
   fetchData();

@@ -89,6 +89,23 @@ def create_default_users():
         users_collection.insert_many(users)
 
 
+# -------- NEW: Ensure Default Admin Exists Always --------
+def ensure_admin_exists():
+    admin = users_collection.find_one({"username": "corp_admin"})
+    if not admin:
+        admin_hash = "$2b$12$u0YlVuJd3i7x7gOToPEhxe15Ur8YbIz7uO5gwYQb2RZfpFWyqJHZO"
+        users_collection.insert_one({
+            "username": "corp_admin",
+            "password": admin_hash,
+            "role": "corporation",
+            "phone": None,
+            "is_verified": True
+        })
+        print("✔ Default admin user restored")
+    else:
+        print("ℹ Admin already exists")
+
+
 def generate_otp():
     """Generate a 6-digit OTP as a string."""
     return f"{random.randint(100000, 999999)}"
@@ -97,7 +114,6 @@ def generate_otp():
 # -----------------------------
 # Authentication & OTP
 # -----------------------------
-
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json() or {}
@@ -326,5 +342,6 @@ def dashboard():
 
 
 if __name__ == "__main__":
+    ensure_admin_exists()  # ➜ ADDED HERE
     create_default_users()
     app.run(debug=True)
