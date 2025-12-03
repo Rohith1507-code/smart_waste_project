@@ -135,6 +135,7 @@ let previousAlertCount = 0;
 
 function showToast(message) {
   const toast = document.getElementById("toast");
+  if (!toast) return;
   toast.textContent = "🔔 " + message;
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 4000);
@@ -150,7 +151,10 @@ logoutBtn?.addEventListener("click", () => {
 async function fetchData() {
   if (!token) return (window.location.href = "/");
 
-  document.getElementById("roleTitle").textContent = `Logged in as: ${role.toUpperCase()}`;
+  const roleTitle = document.getElementById("roleTitle");
+  if (roleTitle && role) {
+    roleTitle.textContent = `Logged in as: ${role.toUpperCase()}`;
+  }
 
   const binsRes = await fetch("/get_bins");
   const binsData = await binsRes.json();
@@ -174,6 +178,8 @@ async function fetchData() {
 // Populate Bins
 function populateBins(bins, containerId, showTime) {
   const container = document.getElementById(containerId);
+  if (!container) return;
+
   container.innerHTML = "";
 
   bins.forEach(bin => {
@@ -194,42 +200,87 @@ function populateBins(bins, containerId, showTime) {
   });
 }
 
-// Alerts
+// Alerts (with Mark as Collected)
 function populateAlerts(alerts) {
   const container = document.getElementById("alertsContainer");
+  if (!container) return;
+
   container.innerHTML = "";
 
-  if (!alerts?.length) {
+  if (!alerts || !alerts.length) {
     container.innerHTML = "<p>No Alerts 🎉</p>";
     previousAlertCount = 0;
     return;
   }
 
-  if (alerts.length > previousAlertCount)
+  if (alerts.length > previousAlertCount) {
     showToast(`${alerts.length - previousAlertCount} new alert(s)`);
+  }
 
   previousAlertCount = alerts.length;
 
   alerts.forEach(a => {
     const div = document.createElement("div");
     div.classList.add("card", "alert");
+
+    const statusText = a.collected ? "✅ Collected" : "❌ Pending";
+    const btnHTML = !a.collected
+      ? `<br><button class="collectBtn" data-id="${a._id}">Mark as Collected</button>`
+      : "";
+
     div.innerHTML = `
-      <b>${a.message}</b><br>${a.waste_type}<br>${new Date(a.timestamp).toLocaleString()}
+      <b>${a.message}</b><br>
+      Type: ${a.waste_type} | Bin: ${a.bin_id}<br>
+      Time: ${new Date(a.timestamp).toLocaleString()}<br>
+      Status: ${statusText}
+      ${btnHTML}
     `;
     container.appendChild(div);
+  });
+
+  // Enable "Mark as Collected" buttons
+  const collectButtons = container.querySelectorAll(".collectBtn");
+  collectButtons.forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const id = e.target.getAttribute("data-id");
+      if (!id) return;
+
+      try {
+        const res = await fetch(`/collect/${id}`, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token
+          }
+        });
+
+        if (res.ok) {
+          showToast("🧹 Bin marked as collected!");
+          fetchData();
+        } else {
+          showToast("❌ Failed to update!");
+        }
+      } catch {
+        showToast("⚠️ Network error!");
+      }
+    });
   });
 }
 
 // === GOOGLE MAP INTEGRATION ===
 let map;
 function initMap() {
-  map = new google.maps.Map(document.getElementById("map"), {
+  const mapEl = document.getElementById("map");
+  if (!mapEl) return;
+
+  map = new google.maps.Map(mapEl, {
     center: { lat: 13.06330, lng: 77.80150 },
     zoom: 17
   });
 }
 
 function updateMap(bins) {
+  if (!map || !bins) return;
+
   bins.forEach(bin => {
     if (!bin.latitude || !bin.longitude) return;
 
@@ -254,7 +305,7 @@ function updateMap(bins) {
   });
 }
 
-// Load Map Script
+// Load Map Script + start dashboard
 if (window.location.pathname.includes("/dashboard")) {
   const s = document.createElement("script");
   s.src = `https://maps.googleapis.com/maps/api/js?key=${window.MAPS_KEY}&callback=initMap`;
