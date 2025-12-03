@@ -89,21 +89,28 @@ def create_default_users():
         users_collection.insert_many(users)
 
 
-# -------- NEW: Ensure Default Admin Exists Always --------
+# -------- Ensure Default Admin Exists / Is Reset --------
 def ensure_admin_exists():
-    admin = users_collection.find_one({"username": "corp_admin"})
-    if not admin:
-        admin_hash = "$2b$12$u0YlVuJd3i7x7gOToPEhxe15Ur8YbIz7uO5gwYQb2RZfpFWyqJHZO"
-        users_collection.insert_one({
-            "username": "corp_admin",
-            "password": admin_hash,
-            "role": "corporation",
-            "phone": None,
-            "is_verified": True
-        })
-        print("✔ Default admin user restored")
-    else:
-        print("ℹ Admin already exists")
+    """
+    Always ensure there is a corp_admin user with password 'corp123'.
+    This uses the same bcrypt library as login(), so credentials will match.
+    """
+    admin_password_hash = bcrypt.hashpw("corp123".encode(), bcrypt.gensalt()).decode()
+
+    users_collection.update_one(
+        {"username": "corp_admin"},
+        {
+            "$set": {
+                "username": "corp_admin",
+                "password": admin_password_hash,
+                "role": "corporation",
+                "phone": None,
+                "is_verified": True
+            }
+        },
+        upsert=True
+    )
+    print("✔ corp_admin ensured/updated in database")
 
 
 def generate_otp():
@@ -342,6 +349,6 @@ def dashboard():
 
 
 if __name__ == "__main__":
-    ensure_admin_exists()  # ➜ ADDED HERE
+    ensure_admin_exists()
     create_default_users()
     app.run(debug=True)
