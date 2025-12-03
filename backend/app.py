@@ -113,6 +113,32 @@ def ensure_admin_exists():
     print("✔ corp_admin ensured/updated in database")
 
 
+@app.route("/reset_admin", methods=["GET"])
+def reset_admin():
+    """
+    Force-reset or create the corp_admin user with password 'corp123'.
+    Call this once from browser if admin login is not working.
+    """
+    admin_password_hash = bcrypt.hashpw("corp123".encode(), bcrypt.gensalt()).decode()
+
+    users_collection.update_one(
+        {"username": "corp_admin"},
+        {
+            "$set": {
+                "username": "corp_admin",
+                "password": admin_password_hash,
+                "role": "corporation",
+                "phone": None,
+                "is_verified": True
+            }
+        },
+        upsert=True
+    )
+    return jsonify({
+        "msg": "corp_admin reset. Use username 'corp_admin', password 'corp123', role 'corporation'."
+    }), 200
+
+
 def generate_otp():
     """Generate a 6-digit OTP as a string."""
     return f"{random.randint(100000, 999999)}"
