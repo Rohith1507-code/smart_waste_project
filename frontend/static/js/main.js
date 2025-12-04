@@ -265,16 +265,17 @@ function initMap() {
 
 async function fetchBins() {
   try {
-    const res = await fetch("https://smart-waste-project.onrender.com/get_all_bins");
-    const bins = await res.json();
-    updateMap(bins);
+    const res = await fetch("/get_bins");
+    const data = await res.json();
+    updateMap(data.bins); // Extract bins array properly
   } catch (error) {
     console.error("Error fetching bins:", error);
   }
 }
 
+
 function updateMap(bins) {
-  if (!map) return;
+  if (!map || !bins) return;
 
   // Remove old markers
   markers.forEach(m => m.setMap(null));
@@ -285,7 +286,6 @@ function updateMap(bins) {
 
     const lat = parseFloat(bin.latitude);
     const lng = parseFloat(bin.longitude);
-
     if (isNaN(lat) || isNaN(lng)) return;
 
     const fill = bin.fill_level;
@@ -307,6 +307,7 @@ function updateMap(bins) {
     markers.push(marker);
   });
 }
+
 
 
 // === Scroll to Top Button ===
