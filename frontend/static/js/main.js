@@ -248,36 +248,66 @@ function populateAlerts(alerts) {
 
 // === GOOGLE MAP INTEGRATION ===
 let map;
+let markers = [];
+
 function initMap() {
   const mapEl = document.getElementById("map");
   if (!mapEl) return;
+
   map = new google.maps.Map(mapEl, {
     center: { lat: 13.06330, lng: 77.80150 },
-    zoom: 17
+    zoom: 16,
   });
+
+  fetchBins();
+  setInterval(fetchBins, 5000); // auto refresh
+}
+
+async function fetchBins() {
+  try {
+    const res = await fetch("https://smart-waste-project.onrender.com/get_all_bins");
+    const bins = await res.json();
+    updateMap(bins);
+  } catch (error) {
+    console.error("Error fetching bins:", error);
+  }
 }
 
 function updateMap(bins) {
   if (!map) return;
+
+  // Remove old markers
+  markers.forEach(m => m.setMap(null));
+  markers = [];
+
   bins.forEach(bin => {
     if (!bin.latitude || !bin.longitude) return;
-    const fill = bin.fill_level;
-    const color = fill < 70 ? "green" : fill < 90 ? "orange" : "red";
 
-    new google.maps.Marker({
-      position: { lat: bin.latitude, lng: bin.longitude },
+    const lat = parseFloat(bin.latitude);
+    const lng = parseFloat(bin.longitude);
+
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    const fill = bin.fill_level;
+    const color = fill < 50 ? "green" : fill < 90 ? "orange" : "red";
+
+    const marker = new google.maps.Marker({
+      position: { lat, lng },
       map,
+      title: `${bin.bin_id} - ${fill}% full`,
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         fillColor: color,
         fillOpacity: 1,
+        strokeWeight: 1,
         scale: 10,
-        strokeWeight: 1
       },
-      title: `${bin.bin_id} ${fill}%`
     });
+
+    markers.push(marker);
   });
 }
+
 
 // === Scroll to Top Button ===
 const scrollBtn = document.getElementById("scrollTopBtn");
